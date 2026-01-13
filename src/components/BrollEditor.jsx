@@ -1,0 +1,440 @@
+import { useState } from 'react';
+import axios from 'axios';
+import { Upload, Film, Play, Loader2, CheckCircle, Clock, X, FileVideo, Sparkles, Download, Eye, LogOut, User } from 'lucide-react';
+import { API_ENDPOINTS } from '../constants/api';
+
+const BrollEditor = ({ onLogout }) => {
+  const [aRoll, setARoll] = useState(null);
+  const [bRolls, setBRolls] = useState([]);
+  const [processing, setProcessing] = useState(false);
+  const [result, setResult] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e, type) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      if (type === 'aroll') {
+        setARoll(e.dataTransfer.files[0]);
+      } else {
+        setBRolls(e.dataTransfer.files);
+      }
+    }
+  };
+
+  const removeFile = (type, index = null) => {
+    if (type === 'aroll') {
+      setARoll(null);
+    } else {
+      const newBRolls = Array.from(bRolls).filter((_, i) => i !== index);
+      setBRolls(newBRolls);
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+
+
+  const handleUpload = async (e) => {
+    e.preventDefault();
+    if (!aRoll || bRolls.length === 0) return;
+
+    setProcessing(true);
+    setUploadProgress(0);
+    const formData = new FormData();
+    formData.append('a_roll', aRoll);
+    Array.from(bRolls).forEach(file => {
+      formData.append('b_rolls', file);
+    });
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await axios.post(API_ENDPOINTS.BROLL_PROCESS, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
+        },
+      });
+      
+      console.log('API Response:', response.data);
+      
+      const plan = response.data.data?.plan || response.data.plan;
+      
+      if (!plan) {
+        throw new Error('Invalid response format from server');
+      }
+      
+      setResult(plan);
+    } catch (error) {
+      console.error('Error:', error);
+      const errorMsg = error.response?.data?.data || error.message;
+      alert('Failed to process video: ' + errorMsg);
+    } finally {
+      setProcessing(false);
+      setUploadProgress(0);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-slate-50 font-sans">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden pt-12 pb-6">
+        <div className="container mx-auto px-6">
+          <div className="flex justify-between items-center mb-4">
+            <div className="text-center flex-1">
+              <h1 className="text-3xl md:text-4xl font-bold mb-3 text-slate-100">
+                Smart B-Roll Inserter
+              </h1>
+              <p className="text-base text-slate-400 max-w-2xl mx-auto">
+                Transform your talking-head videos with AI-powered B-roll insertions.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-slate-400">
+                <User className="w-4 h-4" />
+                <span className="text-sm">
+                  {(() => {
+                    try {
+                      const user = JSON.parse(localStorage.getItem('user') || '{}');
+                      return user.email || 'User';
+                    } catch {
+                      return 'User';
+                    }
+                  })()}
+                </span>
+              </div>
+              <button
+                onClick={onLogout}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-lg text-slate-300 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="text-sm">Logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <main className="container mx-auto px-6 pb-16 relative z-10">
+        <div className="grid lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
+          
+          {/* Upload Card */}
+          <div className="bg-slate-800 border border-slate-700 p-6 rounded-xl shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <div className="p-1.5 bg-blue-600 rounded-lg">
+                  <Upload className="w-5 h-5 text-white" />
+                </div>
+                Upload Assets
+              </h2>
+              <div className="text-xs text-slate-500 bg-slate-700 px-2 py-1 rounded-full">
+                Step 1 of 2
+              </div>
+            </div>
+            
+            <form onSubmit={handleUpload} className="space-y-4">
+              {/* A-Roll Upload */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  A-Roll (Main Video) <span className="text-red-400">*</span>
+                </label>
+                
+                {aRoll ? (
+                  <div className="bg-slate-700 border border-slate-600 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-green-600 rounded">
+                          <FileVideo className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-slate-200 truncate max-w-48">{aRoll.name}</p>
+                          <p className="text-xs text-slate-400">{formatFileSize(aRoll.size)}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFile('aroll')}
+                        className="p-1 hover:bg-red-600 rounded transition-colors"
+                      >
+                        <X className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label 
+                    className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg transition-all cursor-pointer ${
+                      dragActive 
+                        ? 'border-blue-400 bg-blue-500/10' 
+                        : 'border-slate-600 hover:border-blue-500 hover:bg-slate-700/50'
+                    }`}
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={(e) => handleDrop(e, 'aroll')}
+                  >
+                    <div className="flex flex-col items-center justify-center pt-4 pb-4">
+                      <div className="p-2 bg-slate-700 rounded-lg mb-2">
+                        <Film className="w-6 h-6 text-slate-400" />
+                      </div>
+                      <p className="text-sm font-medium text-slate-300 mb-1">
+                        Drop your A-Roll here or click to browse
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        MP4, MOV, AVI up to 500MB
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="video/*"
+                      onChange={(e) => setARoll(e.target.files[0])}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* B-Roll Upload */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  B-Roll Videos <span className="text-red-400">*</span>
+                  {bRolls.length > 0 && (
+                    <span className="ml-2 text-xs bg-blue-600 text-white px-2 py-1 rounded-full">
+                      {bRolls.length} file{bRolls.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </label>
+                
+                {bRolls.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="max-h-24 overflow-y-auto space-y-1">
+                      {Array.from(bRolls).map((file, index) => (
+                        <div key={index} className="bg-slate-700 border border-slate-600 rounded-lg p-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="p-1 bg-purple-600 rounded">
+                                <FileVideo className="w-3 h-3 text-white" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-slate-200 truncate max-w-40">{file.name}</p>
+                                <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeFile('broll', index)}
+                              className="p-1 hover:bg-red-600 rounded transition-colors"
+                            >
+                              <X className="w-3 h-3 text-white" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <label className="flex items-center justify-center w-full h-10 border border-dashed border-slate-600 rounded-lg hover:border-blue-500 hover:bg-slate-700/50 transition cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <Upload className="w-4 h-4 text-slate-400" />
+                        <span className="text-sm text-slate-400">Add more B-Roll videos</span>
+                      </div>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="video/*"
+                        multiple
+                        onChange={(e) => setBRolls([...bRolls, ...e.target.files])}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <label 
+                    className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg transition-all cursor-pointer ${
+                      dragActive 
+                        ? 'border-purple-400 bg-purple-500/10' 
+                        : 'border-slate-600 hover:border-purple-500 hover:bg-slate-700/50'
+                    }`}
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={(e) => handleDrop(e, 'broll')}
+                  >
+                    <div className="flex flex-col items-center justify-center pt-4 pb-4">
+                      <div className="p-2 bg-slate-700 rounded-lg mb-2">
+                        <Upload className="w-6 h-6 text-slate-400" />
+                      </div>
+                      <p className="text-sm font-medium text-slate-300 mb-1">
+                        Drop B-Roll videos here or click to browse
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Multiple files supported • MP4, MOV, AVI
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="video/*"
+                      multiple
+                      onChange={(e) => setBRolls(e.target.files)}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Progress Bar */}
+              {processing && uploadProgress > 0 && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-400">Uploading...</span>
+                    <span className="text-blue-400">{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-slate-700 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={!aRoll || bRolls.length === 0 || processing}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {processing ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5" />
+                    <span>Generate B-Roll Plan</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* Results Card */}
+          <div className="bg-slate-800 border border-slate-700 p-6 rounded-xl shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <div className="p-1.5 bg-green-600 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-white" />
+                </div>
+                B-Roll Plan
+              </h2>
+              <div className="text-xs text-slate-500 bg-slate-700 px-2 py-1 rounded-full">
+                Step 2 of 2
+              </div>
+            </div>
+            
+            {!result && !processing && (
+              <div className="text-center py-12">
+                <div className="p-3 bg-slate-700 rounded-xl inline-block mb-4">
+                  <Clock className="w-10 h-10 text-slate-400" />
+                </div>
+                <h3 className="text-lg font-medium text-slate-300 mb-2">Ready to Generate</h3>
+                <p className="text-slate-500 max-w-sm mx-auto">
+                  Upload your A-Roll and B-Roll videos to create an intelligent insertion plan
+                </p>
+              </div>
+            )}
+
+            {processing && (
+              <div className="text-center py-12">
+                <div className="p-3 bg-blue-600/20 rounded-xl inline-block mb-4">
+                  <Loader2 className="w-10 h-10 text-blue-400 animate-spin" />
+                </div>
+                <h3 className="text-lg font-medium text-blue-300 mb-2">AI Processing</h3>
+                <p className="text-slate-400 max-w-sm mx-auto mb-4">
+                  Analyzing your content and generating optimal B-roll insertions...
+                </p>
+                <div className="flex items-center justify-center gap-1">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce delay-100"></div>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce delay-200"></div>
+                </div>
+              </div>
+            )}
+
+            {result && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                    <span className="text-sm font-medium text-green-400">Plan Generated Successfully</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                      <Eye className="w-4 h-4 text-slate-400" />
+                    </button>
+                    <button className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                      <Download className="w-4 h-4 text-slate-400" />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="bg-slate-700 border border-slate-600 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-1.5 bg-green-600 rounded">
+                      <Sparkles className="w-4 h-4 text-white" />
+                    </div>
+                    <h3 className="font-semibold text-slate-200">Generated B-Roll Plan</h3>
+                  </div>
+                  
+                  <div className="bg-slate-900 rounded-lg p-3 border border-slate-700">
+                    <pre className="text-sm text-slate-300 whitespace-pre-wrap overflow-auto max-h-80">
+                      {JSON.stringify(result, null, 2)}
+                    </pre>
+                  </div>
+                  
+                  <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                    <span>Generated with AI • Ready for implementation</span>
+                    <span>{new Date().toLocaleTimeString()}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors">
+                    <Play className="w-4 h-4" />
+                    Preview
+                  </button>
+                  <button className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 font-medium py-2.5 px-4 rounded-lg transition-colors">
+                    <Download className="w-4 h-4" />
+                    Export
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default BrollEditor;
