@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.VITE_API_BASE_URL || 'https://ambika-roller.onrender.com';
+const API_BASE_URL = 'http://localhost:7173'
 
 export const API_ENDPOINTS = {
   BROLL_PROCESS: `${API_BASE_URL}/api/broll/process`,

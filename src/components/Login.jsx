@@ -64,6 +64,11 @@ const Login = ({ onLoginSuccess }) => {
       const response = await axios.post(API_ENDPOINTS.USER_LOGIN, {
         email: formData.email.trim(),
         password: formData.password
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        withCredentials: false
       });
 
       if (response.data.status === 'Success' || response.data.success) {
