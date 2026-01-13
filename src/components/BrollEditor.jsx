@@ -84,16 +84,17 @@ const BrollEditor = ({ onLogout }) => {
       
       console.log('API Response:', response.data);
       
-      if (response.data.success) {
+      // Handle new response structure from response helper
+      if (response.data.status === 'Success' || response.data.success) {
         const plan = response.data.data?.plan || response.data.plan;
         
         if (!plan) {
           throw new Error('Invalid response format from server');
         }
         
-        setResult(plan);
+        setResult(response.data.data || response.data);
       } else {
-        throw new Error(response.data.message || 'Failed to process video');
+        throw new Error(response.data.message || response.data.data || 'Failed to process video');
       }
     } catch (error) {
       console.error('Error:', error);
@@ -349,6 +350,16 @@ const BrollEditor = ({ onLogout }) => {
                 </div>
               )}
 
+              {/* Error Display */}
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                    <p className="text-red-400 text-sm">{error}</p>
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={!aRoll || bRolls.length === 0 || processing}
@@ -414,51 +425,122 @@ const BrollEditor = ({ onLogout }) => {
 
             {result && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-                    <span className="text-sm font-medium text-green-400">Plan Generated Successfully</span>
+                {/* Check if there's an error in the response */}
+                {result.plan?._raw_response?.includes('error') || result.plan?.insertions?.length === 0 ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                      <span className="text-sm font-medium text-yellow-400">Processing Completed with Issues</span>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
-                      <Eye className="w-4 h-4 text-slate-400" />
-                    </button>
-                    <button className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
-                      <Download className="w-4 h-4 text-slate-400" />
-                    </button>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                      <span className="text-sm font-medium text-green-400">Plan Generated Successfully</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                        <Eye className="w-4 h-4 text-slate-400" />
+                      </button>
+                      <button className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                        <Download className="w-4 h-4 text-slate-400" />
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
                 
                 <div className="bg-slate-700 border border-slate-600 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 bg-green-600 rounded">
+                    <div className={`p-1.5 rounded ${result.plan?._raw_response?.includes('error') ? 'bg-yellow-600' : 'bg-green-600'}`}>
                       <Sparkles className="w-4 h-4 text-white" />
                     </div>
-                    <h3 className="font-semibold text-slate-200">Generated B-Roll Plan</h3>
+                    <h3 className="font-semibold text-slate-200">B-Roll Processing Result</h3>
                   </div>
+
+                  {/* Show error message if present */}
+                  {result.plan?._raw_response?.includes('error') && (
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mb-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center">
+                          <span className="text-xs text-white font-bold">!</span>
+                        </div>
+                        <span className="text-yellow-400 font-medium text-sm">API Quota Exceeded</span>
+                      </div>
+                      <p className="text-yellow-300 text-sm">
+                        OpenAI API quota has been exceeded. Please check your billing details or try again later.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Processing Stats */}
+                  {result.meta && (
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div className="bg-slate-800 rounded-lg p-3">
+                        <div className="text-xs text-slate-400 mb-1">Processing Time</div>
+                        <div className="text-lg font-semibold text-slate-200">
+                          {(result.meta.processing_time_ms / 1000).toFixed(1)}s
+                        </div>
+                      </div>
+                      <div className="bg-slate-800 rounded-lg p-3">
+                        <div className="text-xs text-slate-400 mb-1">Clips Processed</div>
+                        <div className="text-lg font-semibold text-slate-200">
+                          {result.meta.clip_count || 0}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Insertions Count */}
+                  {result.plan?.insertions && (
+                    <div className="bg-slate-800 rounded-lg p-3 mb-3">
+                      <div className="text-xs text-slate-400 mb-1">B-Roll Insertions</div>
+                      <div className="text-lg font-semibold text-slate-200">
+                        {result.plan.insertions.length} insertion{result.plan.insertions.length !== 1 ? 's' : ''} planned
+                      </div>
+                    </div>
+                  )}
                   
-                  <div className="bg-slate-900 rounded-lg p-3 border border-slate-700">
-                    <pre className="text-sm text-slate-300 whitespace-pre-wrap overflow-auto max-h-80">
-                      {JSON.stringify(result, null, 2)}
-                    </pre>
-                  </div>
+
                   
                   <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                    <span>Generated with AI • Ready for implementation</span>
+                    <span>
+                      {result.plan?._raw_response?.includes('error') 
+                        ? 'Processing completed with errors' 
+                        : 'Generated with AI • Ready for implementation'
+                      }
+                    </span>
                     <span>{new Date().toLocaleTimeString()}</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors">
-                    <Play className="w-4 h-4" />
-                    Preview
+                {/* Action Buttons - Only show if successful */}
+                {!result.plan?._raw_response?.includes('error') && result.plan?.insertions?.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors">
+                      <Play className="w-4 h-4" />
+                      Preview
+                    </button>
+                    <button className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 font-medium py-2.5 px-4 rounded-lg transition-colors">
+                      <Download className="w-4 h-4" />
+                      Export
+                    </button>
+                  </div>
+                )}
+
+                {/* Retry Button for Errors */}
+                {result.plan?._raw_response?.includes('error') && (
+                  <button 
+                    onClick={() => {
+                      setResult(null);
+                      // Optionally trigger a retry
+                    }}
+                    className="w-full flex items-center justify-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Try Again
                   </button>
-                  <button className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 font-medium py-2.5 px-4 rounded-lg transition-colors">
-                    <Download className="w-4 h-4" />
-                    Export
-                  </button>
-                </div>
+                )}
               </div>
             )}
           </div>
