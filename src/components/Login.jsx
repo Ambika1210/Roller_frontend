@@ -2,6 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { LogIn, Loader2, Eye, EyeOff, User, Lock } from 'lucide-react';
 import { API_ENDPOINTS } from '../constants/api';
+import { getErrorMessage, isValidationError } from '../utils/errorHandler';
 
 const Login = ({ onLoginSuccess }) => {
   const [formData, setFormData] = useState({
@@ -11,19 +12,48 @@ const Login = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
+    
+    // Clear errors when user starts typing
     if (error) setError('');
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    
+    if (!formData.password.trim()) {
+      errors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    }
+    
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.email || !formData.password) {
-      setError('Please fill in all fields');
+    
+    if (!validateForm()) {
       return;
     }
 
@@ -32,22 +62,34 @@ const Login = ({ onLoginSuccess }) => {
 
     try {
       const response = await axios.post(API_ENDPOINTS.USER_LOGIN, {
-        email: formData.email,
+        email: formData.email.trim(),
         password: formData.password
       });
 
-      if (response.data.success) {
-        const { token, user } = response.data.data;
+      if (response.data.status === 'Success' || response.data.success) {
+        // Handle the new response structure from response helper
+        const responseData = response.data.data;
+        const { token, user } = responseData.user || responseData;
+        
+        // Store authentication data
         localStorage.setItem('authToken', token);
         localStorage.setItem('user', JSON.stringify(user));
+        
+        // Call success callback
         onLoginSuccess();
       } else {
         setError(response.data.message || 'Login failed');
       }
     } catch (error) {
       console.error('Login error:', error);
-      const errorMessage = error.response?.data?.message || 'Login failed. Please try again.';
-      setError(errorMessage);
+      const errorMessage = getErrorMessage(error);
+      
+      // Handle validation errors differently
+      if (isValidationError(error)) {
+        setError(errorMessage);
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -86,11 +128,16 @@ const Login = ({ onLoginSuccess }) => {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full pl-10 pr-4 py-3 bg-slate-700 border rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    fieldErrors.email ? 'border-red-500' : 'border-slate-600'
+                  }`}
                   placeholder="Enter your email"
                   disabled={loading}
                 />
               </div>
+              {fieldErrors.email && (
+                <p className="text-red-400 text-sm mt-1">{fieldErrors.email}</p>
+              )}
             </div>
 
             {/* Password Field */}
@@ -107,7 +154,9 @@ const Login = ({ onLoginSuccess }) => {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-12 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full pl-10 pr-12 py-3 bg-slate-700 border rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    fieldErrors.password ? 'border-red-500' : 'border-slate-600'
+                  }`}
                   placeholder="Enter your password"
                   disabled={loading}
                 />
@@ -124,6 +173,9 @@ const Login = ({ onLoginSuccess }) => {
                   )}
                 </button>
               </div>
+              {fieldErrors.password && (
+                <p className="text-red-400 text-sm mt-1">{fieldErrors.password}</p>
+              )}
             </div>
 
             {/* Error Message */}

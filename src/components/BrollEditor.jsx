@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { Upload, Film, Play, Loader2, CheckCircle, Clock, X, FileVideo, Sparkles, Download, Eye, LogOut, User } from 'lucide-react';
+import { Upload, Film, Play, Loader2, CheckCircle, Clock, X, FileVideo, Sparkles, Download, Eye, LogOut, User, AlertCircle } from 'lucide-react';
 import { API_ENDPOINTS } from '../constants/api';
+import { getErrorMessage, isServerError } from '../utils/errorHandler';
 
 const BrollEditor = ({ onLogout }) => {
   const [aRoll, setARoll] = useState(null);
@@ -10,6 +11,7 @@ const BrollEditor = ({ onLogout }) => {
   const [result, setResult] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [error, setError] = useState('');
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -52,14 +54,15 @@ const BrollEditor = ({ onLogout }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-
-
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!aRoll || bRolls.length === 0) return;
 
     setProcessing(true);
     setUploadProgress(0);
+    setError('');
+    setResult(null);
+    
     const formData = new FormData();
     formData.append('a_roll', aRoll);
     Array.from(bRolls).forEach(file => {
@@ -81,17 +84,26 @@ const BrollEditor = ({ onLogout }) => {
       
       console.log('API Response:', response.data);
       
-      const plan = response.data.data?.plan || response.data.plan;
-      
-      if (!plan) {
-        throw new Error('Invalid response format from server');
+      if (response.data.success) {
+        const plan = response.data.data?.plan || response.data.plan;
+        
+        if (!plan) {
+          throw new Error('Invalid response format from server');
+        }
+        
+        setResult(plan);
+      } else {
+        throw new Error(response.data.message || 'Failed to process video');
       }
-      
-      setResult(plan);
     } catch (error) {
       console.error('Error:', error);
-      const errorMsg = error.response?.data?.data || error.message;
-      alert('Failed to process video: ' + errorMsg);
+      const errorMessage = getErrorMessage(error);
+      setError(errorMessage);
+      
+      // If it's a server error, suggest trying again
+      if (isServerError(error)) {
+        setError(`${errorMessage} Please try again in a moment.`);
+      }
     } finally {
       setProcessing(false);
       setUploadProgress(0);
@@ -139,6 +151,25 @@ const BrollEditor = ({ onLogout }) => {
       </div>
 
       <main className="container mx-auto px-6 pb-16 relative z-10">
+        {/* Error Message */}
+        {error && (
+          <div className="max-w-5xl mx-auto mb-6">
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-red-400 font-medium mb-1">Processing Failed</h3>
+                <p className="text-red-300 text-sm">{error}</p>
+              </div>
+              <button
+                onClick={() => setError('')}
+                className="ml-auto p-1 hover:bg-red-500/20 rounded transition-colors"
+              >
+                <X className="w-4 h-4 text-red-400" />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
           
           {/* Upload Card */}
