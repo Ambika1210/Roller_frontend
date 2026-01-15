@@ -12,6 +12,96 @@ const BrollEditor = ({ onLogout }) => {
   const [dragActive, setDragActive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  const handlePreview = () => {
+    if (!result?.plan) return;
+    
+    // Create a preview of the plan data
+    const planData = JSON.stringify(result.plan, null, 2);
+    const blob = new Blob([planData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    // Open in new window
+    const previewWindow = window.open('', '_blank');
+    previewWindow.document.write(`
+      <html>
+        <head>
+          <title>B-Roll Plan Preview</title>
+          <style>
+            body {
+              font-family: monospace;
+              background: #1e293b;
+              color: #e2e8f0;
+              padding: 20px;
+              margin: 0;
+            }
+            pre {
+              background: #0f172a;
+              padding: 20px;
+              border-radius: 8px;
+              overflow-x: auto;
+            }
+            h1 {
+              color: #60a5fa;
+            }
+            .insertion {
+              background: #1e293b;
+              border: 1px solid #334155;
+              padding: 15px;
+              margin: 10px 0;
+              border-radius: 8px;
+            }
+            .label {
+              color: #94a3b8;
+              font-size: 12px;
+            }
+            .value {
+              color: #e2e8f0;
+              font-size: 14px;
+              margin-top: 5px;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>B-Roll Insertion Plan</h1>
+          <div>
+            ${result.plan.insertions.map((ins, idx) => `
+              <div class="insertion">
+                <h3>Insertion ${idx + 1}</h3>
+                <div class="label">Start Time</div>
+                <div class="value">${ins.start_sec} seconds</div>
+                <div class="label">Duration</div>
+                <div class="value">${ins.duration_sec} seconds</div>
+                <div class="label">B-Roll ID</div>
+                <div class="value">${ins.broll_id}</div>
+                <div class="label">Reason</div>
+                <div class="value">${ins.reason}</div>
+              </div>
+            `).join('')}
+          </div>
+          <h2>Raw JSON</h2>
+          <pre>${planData}</pre>
+        </body>
+      </html>
+    `);
+  };
+
+  const handleDownload = () => {
+    if (!result?.plan) return;
+    
+    // Create downloadable JSON file
+    const planData = JSON.stringify(result.plan, null, 2);
+    const blob = new Blob([planData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `broll-plan-${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -440,10 +530,18 @@ const BrollEditor = ({ onLogout }) => {
                       <span className="text-sm font-medium text-green-400">Plan Generated Successfully</span>
                     </div>
                     <div className="flex gap-2">
-                      <button className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                      <button 
+                        onClick={handlePreview}
+                        className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                        title="Preview Plan"
+                      >
                         <Eye className="w-4 h-4 text-slate-400" />
                       </button>
-                      <button className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                      <button 
+                        onClick={handleDownload}
+                        className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                        title="Download Plan"
+                      >
                         <Download className="w-4 h-4 text-slate-400" />
                       </button>
                     </div>
@@ -517,11 +615,17 @@ const BrollEditor = ({ onLogout }) => {
                 {/* Action Buttons - Only show if successful */}
                 {!result.plan?._raw_response?.includes('error') && result.plan?.insertions?.length > 0 && (
                   <div className="grid grid-cols-2 gap-3">
-                    <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors">
+                    <button 
+                      onClick={handlePreview}
+                      className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+                    >
                       <Play className="w-4 h-4" />
                       Preview
                     </button>
-                    <button className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 font-medium py-2.5 px-4 rounded-lg transition-colors">
+                    <button 
+                      onClick={handleDownload}
+                      className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 font-medium py-2.5 px-4 rounded-lg transition-colors"
+                    >
                       <Download className="w-4 h-4" />
                       Export
                     </button>
