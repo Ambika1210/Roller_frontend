@@ -1,5 +1,5 @@
- const API_BASE_URL = 'http://localhost:7173'
- //const API_BASE_URL = 'https://dev-ambika-rollerapi.onrender.com'
+ //const API_BASE_URL = 'http://localhost:7173'
+ const API_BASE_URL = 'https://dev-ambika-rollerapi.onrender.com'
 
 
 export const API_ENDPOINTS = {
