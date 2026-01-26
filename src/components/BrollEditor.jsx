@@ -77,6 +77,8 @@ const BrollEditor = ({ onLogout }) => {
                 <div class="value">${ins.broll_id}</div>
                 <div class="label">Reason</div>
                 <div class="value">${ins.reason}</div>
+                <div class="label">Confidence</div>
+                <div class="value">${ins.confidence ? (ins.confidence * 100).toFixed(0) + '%' : 'N/A'}</div>
               </div>
             `).join('')}
           </div>
